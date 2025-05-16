@@ -9,7 +9,7 @@ builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 
 
-builder.Services.AddScoped<IService, Service>();
+builder.Services.AddScoped<IAppointmentsService, AppointmentsService>();
 
 var app = builder.Build();
 
