@@ -1,4 +1,5 @@
-﻿using APBD_KOLOKWIUM.Models;
+﻿using System.Data.Common;
+using APBD_KOLOKWIUM.Models;
 using Microsoft.Data.SqlClient;
 
 namespace APBD_KOLOKWIUM.Services;
@@ -23,6 +24,50 @@ public class AppointmentsService : IAppointmentsService
         command.Parameters.AddWithValue("@id", id);
         var result = await command.ExecuteScalarAsync();
         return result != null;
+    }
+
+    public async Task<bool> DoesPatientExist(int appointmentPatientId)
+    {
+        await using SqlConnection connection = new SqlConnection(_configuration.GetConnectionString("Default"));
+        await using SqlCommand command = new SqlCommand();
+
+        command.Connection = connection;
+        await connection.OpenAsync();
+        command.CommandText = "Select 1 from Patient where patient_id = @id";
+        command.Parameters.AddWithValue("@id", appointmentPatientId);
+        var result = await command.ExecuteScalarAsync();
+        return result != null;
+    }
+
+    public async Task<bool> DoesDoctorExist(string appointmentPwz)
+    {
+        await using SqlConnection connection = new SqlConnection(_configuration.GetConnectionString("Default"));
+        await using SqlCommand command = new SqlCommand();
+
+        command.Connection = connection;
+        await connection.OpenAsync();
+        command.CommandText = "Select 1 from Doctor where PWZ = @id";
+        command.Parameters.AddWithValue("@id", appointmentPwz);
+        var result = await command.ExecuteScalarAsync();
+        return result != null;
+    }
+
+    public async Task<bool> DoesServiceExist(List<PostAppoinment_Services> appointmentAppointmentServices)
+    {
+        await using SqlConnection connection = new SqlConnection(_configuration.GetConnectionString("Default"));
+        await using SqlCommand command = new SqlCommand();
+
+        command.Connection = connection;
+        await connection.OpenAsync();
+        foreach (var AppSer in appointmentAppointmentServices)
+        {
+            command.CommandText = "Select 1 from Service where name = @id";
+            command.Parameters.AddWithValue("@id", AppSer.serviceName);
+            var result = await command.ExecuteScalarAsync();
+            return result != null;
+        }
+
+        return false;
     }
 
     public async Task<Appointment> GetAppoinment(int id)
@@ -101,5 +146,52 @@ public class AppointmentsService : IAppointmentsService
         }
         appointment.appointmentServices = listOfServices;
         return appointment;
+    }
+
+    public async Task PutAppoinment(PostAppointment appointment)
+    {
+        await using SqlConnection connection = new SqlConnection(_configuration.GetConnectionString("Default"));
+        await using SqlCommand command = new SqlCommand();
+        
+        command.Connection = connection;
+        await connection.OpenAsync();
+        
+        DbTransaction transaction = await connection.BeginTransactionAsync();
+        command.Transaction = transaction as SqlTransaction;
+
+        try
+        {
+            command.CommandText = "Select doctor_id from doctor where PWZ = @pwz";
+            command.Parameters.AddWithValue("@pwz", appointment.pwz);
+            var docId = (int)await command.ExecuteScalarAsync();
+            command.Parameters.Clear();
+            command.CommandText = "Insert into Appointment VALUES (@appointment_id,@patient_id,@doctor_id,@date) ";
+            command.Parameters.AddWithValue("@appointment_id",appointment.appointmentId);
+            command.Parameters.AddWithValue("@patient_id",appointment.patientId);
+            command.Parameters.AddWithValue("@doctor_id",docId);
+            command.Parameters.AddWithValue("@date",DateTime.Now);
+            await command.ExecuteNonQueryAsync();
+            command.Parameters.Clear();
+            foreach (var AppSer in appointment.appointmentServices)
+            {
+                command.Parameters.AddWithValue("@serviceName",AppSer.serviceName);
+                command.CommandText = "Select service_id from Service where name = @serviceName";
+                var ServiceId = (int)await command.ExecuteScalarAsync();
+                command.Parameters.Clear();
+
+                command.CommandText = "Insert Into Appoinment_Service VALUES (@appointment_id,@service_id,@service_fee)";
+                command.Parameters.AddWithValue("@appointment_id", appointment.appointmentId);
+                command.Parameters.AddWithValue("@service_id", ServiceId);
+                command.Parameters.AddWithValue("@service_fee", AppSer.serviceFee);
+                await command.ExecuteNonQueryAsync();
+
+            }
+            await transaction.CommitAsync();
+        }
+        catch (Exception e)
+        {
+            await transaction.RollbackAsync();
+            throw;
+        }
     }
 }
