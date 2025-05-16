@@ -32,7 +32,7 @@ public class AppointmentsController : ControllerBase
     {
         if (await _appointmentsService.DoesAppointmentExist(appointment.appointmentId))
         {
-            return BadRequest();
+            return Conflict();
         }
         if (!await _appointmentsService.DoesPatientExist(appointment.patientId))
         {
