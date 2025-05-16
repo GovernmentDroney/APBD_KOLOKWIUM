@@ -1,3 +1,5 @@
+using APBD_KOLOKWIUM.Services;
+
 var builder = WebApplication.CreateBuilder(args);
 
 
@@ -7,7 +9,7 @@ builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 
 
-//builder.Services.AddScoped<ISmhService, SmhService>();
+builder.Services.AddScoped<IService, Service>();
 
 var app = builder.Build();
 
